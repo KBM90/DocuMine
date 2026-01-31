@@ -14,7 +14,8 @@ import time
 st.set_page_config(
     page_title="DocuMine",
     page_icon="⛏️",
-    layout="wide"
+    layout="wide",
+    menu_items={}
 )
 
 # --- Helper Functions ---
