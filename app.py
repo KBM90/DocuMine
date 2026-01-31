@@ -31,19 +31,40 @@ st.markdown(
 
 # --- Helper Functions ---
 
-def get_pdf_links(url):
+DEFAULT_COOKIES = {
+    "justiceGovAgeVerified": "true"
+}
+
+def parse_cookie_string(cookie_string):
+    """Parses a cookie string (key=value; key2=value2) into a dictionary."""
+    cookies = {}
+    if cookie_string:
+        for item in cookie_string.split(';'):
+            if '=' in item:
+                name, value = item.strip().split('=', 1)
+                cookies[name] = value
+    return cookies
+
+def get_pdf_links(url, cookies=None):
     """Extracts PDF links from the URL."""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        
+        # Merge default cookies with user provided ones
+        session_cookies = DEFAULT_COOKIES.copy()
+        if cookies:
+            session_cookies.update(cookies)
+            
+        response = requests.get(url, headers=headers, cookies=session_cookies, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
         links = []
         for a in soup.find_all('a', href=True):
             href = a['href']
+            # Basic check, can be improved
             if href.lower().endswith('.pdf'):
                 absolute_url = urljoin(url, href)
                 filename = href.split('/')[-1]
@@ -57,8 +78,9 @@ def get_pdf_links(url):
     except Exception as e:
         return [], str(e)
 
-def create_zip_of_pdfs(pdf_list):
+def create_zip_of_pdfs(pdf_list, cookies=None):
     """Downloads PDFs and returns a byte stream of the ZIP file."""
+
     zip_buffer = io.BytesIO()
     
     # Progress bar in the main UI
@@ -72,23 +94,29 @@ def create_zip_of_pdfs(pdf_list):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
 
+    # Merge default cookies with user provided ones
+    session_cookies = DEFAULT_COOKIES.copy()
+    if cookies:
+        session_cookies.update(cookies)
+
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
         for i, pdf in enumerate(pdf_list):
             try:
                 status_text.text(f"Downloading {i+1}/{total}: {pdf['filename']}...")
-                resp = requests.get(pdf['url'], headers=headers, timeout=30)
+                # Pass cookies here!
+                resp = requests.get(pdf['url'], headers=headers, cookies=session_cookies, timeout=30)
                 if resp.status_code == 200:
-                    # Handle duplicate filenames in zip
-                    # (Simple approach: strict filenames from URL might duplicate, 
-                    # zipfile allows duplicates but extracting overwrites. 
-                    # Let's keep it simple for now or append index if needed.
-                    # Appending index to ensure uniqueness in zip)
-                    
-                    # Check if file already exists in zip (not straightforward in write-only mode)
-                    # simpler to just prefix/suffix to ensure uniqueness or trust the source.
-                    # Let's just use the filename.
-                    zip_file.writestr(pdf['filename'], resp.content)
-                    success_count += 1
+                    # Check if actually PDF (not age gate HTML)
+                    content_type = resp.headers.get('Content-Type', '').lower()
+                    if 'application/pdf' in content_type or resp.content.startswith(b'%PDF'):
+                         zip_file.writestr(pdf['filename'], resp.content)
+                         success_count += 1
+                    else:
+                        st.warning(f"Skipped {pdf['filename']}: Not a PDF (Type: {content_type}). Age verification issue?")
+                else:
+                    st.warning(f"Failed to download {pdf['filename']}: Status {resp.status_code}")
+
+
             except Exception:
                 pass # Skip failed downloads
             
@@ -102,6 +130,21 @@ def create_zip_of_pdfs(pdf_list):
     return zip_buffer, success_count
 
 # --- UI Layout ---
+
+# --- Sidebar for Advanced Settings ---
+with st.sidebar:
+    st.header("⚙️ Advanced Settings")
+    st.info("If you encounter age verification blocks or 'I am not a robot' checks, paste your browser cookies here.")
+    
+    cookie_input = st.text_area(
+        "Cookie String", 
+        placeholder="Paste cookies here (e.g., justiceGovAgeVerified=...; QueueITAccepted=...)",
+        help="Open DevTools (F12) -> Application -> Cookies, copy the cookie string."
+    )
+    
+    user_cookies = parse_cookie_string(cookie_input)
+    if user_cookies:
+        st.success(f"Loaded {len(user_cookies)} custom cookies.")
 
 st.title("⛏️ DocuMine")
 st.markdown("""
@@ -119,7 +162,7 @@ if url_input:
     else:
         if st.button("Find PDFs", type="primary"):
             with st.spinner("Scanning page for PDFs..."):
-                links, error = get_pdf_links(url_input)
+                links, error = get_pdf_links(url_input, cookies=user_cookies)
                 
             if error:
                 st.error(f"Error fetching the page: {error}")
@@ -152,7 +195,7 @@ if 'pdf_links' in st.session_state and st.session_state.get('source_url') == url
     
     if st.button("Prepare ZIP Download"):
         with st.spinner("Downloading files and creating ZIP..."):
-            zip_data, count = create_zip_of_pdfs(links)
+            zip_data, count = create_zip_of_pdfs(links, cookies=user_cookies)
             st.session_state['zip_data'] = zip_data
             st.session_state['zip_count'] = count
             st.session_state['zip_ready'] = True
@@ -175,7 +218,7 @@ if 'pdf_links' in st.session_state and st.session_state.get('source_url') == url
     # Convert to simple list of dicts for dataframe or display
     # Let's do a dataframe for cleaner look
     display_data = [{"File Name": l['filename'], "Link Text": l['text'], "URL": l['url']} for l in links]
-    st.dataframe(display_data, use_container_width=True)
+    st.dataframe(display_data, width="stretch")
     
     # Detailed list with individual links
     with st.expander("View Individual Links"):
