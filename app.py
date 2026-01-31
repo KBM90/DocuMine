@@ -15,7 +15,6 @@ st.set_page_config(
     page_title="DocuMine",
     page_icon="⛏️",
     layout="wide",
-    initial_sidebar_state="collapsed",
     menu_items={}
 )
 
