@@ -12,7 +12,7 @@ import zipfile
 import time
 
 st.set_page_config(
-    page_title="DocuMine 2",
+    page_title="DocuMine",
     page_icon="⛏️",
     layout="wide"
 )
@@ -169,4 +169,19 @@ if 'pdf_links' in st.session_state and st.session_state.get('source_url') == url
     with st.expander("View Individual Links"):
         for l in links:
             st.markdown(f"- **[{l['filename']}]({l['url']})**: {l['text']}")
+
+# --- Footer ---
+st.divider()
+st.markdown("### ☕ Support the Developer")
+st.markdown("If this tool helped you, consider buying me a coffee!")
+
+with st.expander("💼 OKX Wallet Addresses"):
+    st.code("TCFDcTTbSKp5WRaMj4jGkJRNgrSzAr33ra", language="text")
+    st.caption("USDT (TRC20)")
+    
+    st.code("0x779faf0ed2a549d70e1053ea83d2d991d5f5edcf", language="text")
+    st.caption("USDC (ERC20)")
+    
+    st.code("37C6azvFCgECTvFfEChuZeLw8UNUoUjwd1", language="text")
+    st.caption("BTC (Bitcoin)")
 
