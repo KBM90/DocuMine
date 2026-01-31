@@ -12,7 +12,7 @@ import zipfile
 import time
 
 st.set_page_config(
-    page_title="DocuMine",
+    page_title="DocuMine 2",
     page_icon="⛏️",
     layout="wide"
 )
