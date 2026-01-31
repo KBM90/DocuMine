@@ -18,6 +18,17 @@ st.set_page_config(
     menu_items={}
 )
 
+st.markdown(
+    """
+    <style>
+        #MainMenu {visibility: hidden;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- Helper Functions ---
 
 def get_pdf_links(url):
